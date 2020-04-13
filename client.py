@@ -8,6 +8,8 @@ serverAddressPort = ("localhost", 3000)
 client.sendto(bytesToSend, serverAddressPort)
 
 bufferSize = 1024
+
 msgFromServer = client.recvfrom(bufferSize)
-msg = "Message from Server {}".format(msgFromServer[0])
+msgFromServer = msgFromServer[0].decode()
+msg = "Message from Server: {}".format(msgFromServer)
 print(msg)

@@ -11,10 +11,27 @@ class Socket:
     self.sock.bind(addressPort)
   
   def sendto(self, data, server):
-    self.sock.sendto(data, server)
+    data = data.decode()
+    n = 3
+    chunks = [data[i:i+n] for i in range(0, len(data), n)]
+    for c in chunks:
+      c = str.encode(c)
+      self.sock.sendto(c, server)
+    end = str.encode("d0ne")
+    self.sock.sendto(end, server)
 
   def recvfrom(self, bufferSize):
-    return self.sock.recvfrom(bufferSize)
+    message = ''
+    address = ''
+    #need to change this limit
+    while (len(message) < bufferSize):
+      newData = self.sock.recvfrom(bufferSize)
+      newMessage = newData[0].decode()
+      if(newMessage == "d0ne"):
+        address = newData[1]
+        break
+      message = message + newMessage      
+    return (str.encode(message), address)
 
 
 if __name__ == "__main__":

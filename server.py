@@ -12,10 +12,10 @@ print("UDP server up and listening")
 while(True):
   bytesAddressPair = server.recvfrom(bufferSize)
 
-  message = bytesAddressPair[0]
+  message = bytesAddressPair[0].decode()
   address = bytesAddressPair[1]
-  clientMsg = "Message from Client:{}".format(message)
-  clientIP  = "Client IP Address:{}".format(address)    
+  clientMsg = "Message from Client: {}".format(message)
+  clientIP  = "Client IP Address: {}".format(address)    
   print(clientMsg)
   print(clientIP)
 
