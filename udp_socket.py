@@ -14,11 +14,23 @@ class Socket:
     data = data.decode()
     n = 3
     chunks = [data[i:i+n] for i in range(0, len(data), n)]
-    for c in chunks:
+
+    seqNumber = 0
+    ackFlag = '0'
+    for i in range(0, len(chunks)):
+      c = chunks[i]
+      flags = ackFlag
+      if(i == len(chunks) - 1):
+        flags = flags + '1'
+      else:
+        flags = flags + '0'
+
+      s = str(seqNumber)
+      header = flags + s.zfill(3 - len(s) + 1)
+      c = header + c
       c = str.encode(c)
       self.sock.sendto(c, server)
-    end = str.encode("d0ne")
-    self.sock.sendto(end, server)
+      seqNumber = (seqNumber + 1) % 1000
 
   def recvfrom(self, bufferSize):
     message = ''
@@ -27,10 +39,16 @@ class Socket:
     while (len(message) < bufferSize):
       newData = self.sock.recvfrom(bufferSize)
       newMessage = newData[0].decode()
-      if(newMessage == "d0ne"):
+      ackFlag = int(newMessage[ : 1])
+      lastFlag = int(newMessage[1 : 2])
+      seqNumber = int(newMessage[2 : 5])
+      if(ackFlag == 1):
+        continue
+      newMessage = newMessage[5: ]
+      message = message + newMessage      
+      if(lastFlag == 1):
         address = newData[1]
         break
-      message = message + newMessage      
     return (str.encode(message), address)
 
 
