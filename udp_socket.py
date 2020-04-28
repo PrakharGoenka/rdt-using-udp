@@ -1,5 +1,6 @@
 import socket
 import time
+import random
 
 
 class Socket:
@@ -68,6 +69,10 @@ class Socket:
           if(ackFlag == 0):
             continue    # manage this later
           seqNumber = int(newMessage[2 : 5])
+          accept = (random.random() > 0.5)
+          if not accept:
+            print('ack with seq no. {} dropped!!'.format(seqNumber))
+            continue
           print('Ack:', seqNumber)
           if(seqNumber < base):    # check this thing
             continue
@@ -81,10 +86,15 @@ class Socket:
     print('Receiving')
     message = ''
     address = ''
-    sendAck = [0] * 1024
+
+    windowSize = 7
+    receiveWindow = [None] * windowSize
+    base = 0    # todo: make base number universal
+    count = 0
+    lastFlagU = 0
     # need to change this limit. Critical area, decide acc to original protocol
     while (len(message) < bufferSize):
-      newData = self.sock.recvfrom(bufferSize)
+      newData = self.sock.recvfrom(8) # set it to the fixed packet size
       newMessage = newData[0].decode()
       address = newData[1]
       ackFlag = int(newMessage[ : 1])
@@ -97,19 +107,37 @@ class Socket:
         print('Ack received: ', newMessage)
         continue
       
-      if(sendAck[seqNumber] == 0):
-        sendAck[seqNumber] = 1
+      accept = (random.random() > 0.5)
+      if not accept:
         print('packet with seq no. {} dropped!!'.format(seqNumber))
-      else:
+        continue
+    
+      if(seqNumber >= base - windowSize - 1 and seqNumber < base + windowSize):   # confirm this
         ack = '10' + newMessage[2 : 5]
         ack = str.encode(ack)
-        self.sock.sendto(ack, address)   
+        self.sock.sendto(ack, address)  
+
+      if(seqNumber >= base and seqNumber < base + windowSize):
         print('header = ', newMessage[ : 5])
         newMessage = newMessage[5: ]
-        message = message + newMessage      
+
+        if(receiveWindow[seqNumber - base] == None):
+          count += 1
+        receiveWindow[seqNumber - base] = newMessage
+        
+        lastFlagU = lastFlag or lastFlagU
         if(lastFlag == 1):
-          break
-    print('header = ', newMessage[ : 5])         
+          windowSize = seqNumber - base + 1
+
+        if(count == windowSize):
+          for i in range(0, windowSize):
+            message += receiveWindow[i]  
+          receiveWindow = [None] * windowSize
+          count = 0
+          base += windowSize
+          if(lastFlagU == 1):
+            break
+                  
     return (str.encode(message), address)
 
 
