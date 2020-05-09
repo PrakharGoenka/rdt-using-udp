@@ -4,7 +4,7 @@ import hashlib
 
 
 class Socket:
-  packetSize = 3
+  packetSize = 7
   windowSize = 7
   sequnceRange = 1000
   sequenceWidth = len(str(sequnceRange))
@@ -12,7 +12,7 @@ class Socket:
   headerWidth = flagWidth + sequenceWidth
   checksumWidth = 16
   segmentSize = headerWidth + packetSize + checksumWidth
-  # baseSequence = 0
+  timeout = 1
 
   def __init__(self):
     self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -20,9 +20,7 @@ class Socket:
   def bind(self, addressPort):
     self.sock.bind(addressPort)
   
-  def sendto(self, data, server):
-    print('Sending')
-
+  def __makeChunks(self, data):
     n = self.packetSize   
     chunks = [data[i : i + n] for i in range(0, len(data), n)]
 
@@ -37,20 +35,25 @@ class Socket:
       flags = ackFlag + lastFlag
 
       s = str(seqNumber)
-      header = flags + s.zfill(self.sequenceWidth)   # add padding for constant length of s
+      header = flags + s.zfill(self.sequenceWidth)   
       header = header.encode()
 
       chunks[i] = header + chunks[i]
-      print('chunk is:', chunks[i])
       checksum = hashlib.md5(chunks[i]).digest()
       chunks[i] += checksum 
       seqNumber = (seqNumber + 1) % self.sequnceRange
+    
+    return chunks
+
+
+  def sendto(self, data, server):
+    chunks = self.__makeChunks(data)    
     
     ack = [0] * self.windowSize
     sendTime = [0] * self.windowSize
     base = 0
     current = 0
-    self.sock.settimeout(1)
+    
     while(base < len(chunks)):
       while(current - base < self.windowSize and current < len(chunks)):
         self.sock.sendto(chunks[current], server)
@@ -62,40 +65,43 @@ class Socket:
         newData = None
 
         try:
+          self.sock.settimeout(max[0, self.timeout - (time.time() - sendTime[base & self.windowSize])])
           newData = self.sock.recvfrom(self.headerWidth)
         except:
           pass
 
         if(newData == None):
+          prevIndex = (base - 1 + self.windowSize) % self.windowSize
+          if(time.time() - sendTime[prevIndex] > 60):
+            ack[base % self.windowSize] = 1    # Assume data delivered after 20 attempts
           self.sock.sendto(chunks[base], server)
           sendTime[base % self.windowSize] = time.time() 
         else:
           newMessage = newData[0].decode()
           ackFlag = int(newMessage[ : 1])
           if(ackFlag == 0):
-            continue    # manage this later
+            continue    
           seqNumber = int(newMessage[self.flagWidth : self.flagWidth + self.sequenceWidth])
-          print('Ack:', seqNumber)
-          if(seqNumber < base):    # check this thing
+          if(seqNumber < base):    
             continue
           ack[seqNumber % self.windowSize] = 1
           
 
       base += 1
     self.sock.settimeout(None)
+    return len(data)
+
 
   def recvfrom(self, bufferSize):
-    print('Receiving')
     message = ''
     address = ''
-
     receiveWindow = [None] * self.windowSize
-    base = 0    # todo: make base number universal
+    base = 0    
     count = 0
     lastFlagU = 0
-    # need to change this limit. Critical area, decide acc to original protocol
+    
     while (len(message) < bufferSize):
-      newData = self.sock.recvfrom(self.segmentSize) # set it to the fixed packet size
+      newData = self.sock.recvfrom(self.segmentSize) 
       newMessage = newData[0][ : -(self.checksumWidth)].decode()
       address = newData[1]
       ackFlag = int(newMessage[ : 1])
@@ -103,15 +109,11 @@ class Socket:
       seqNumber = int(newMessage[self.flagWidth : self.flagWidth + self.sequenceWidth])
       checksum = newData[0][-(self.checksumWidth) : ]
 
-      # wont be receiving acks when receiving messages, coz only one side
-      # speaks at a time
       if(ackFlag == 1):
-        print('Ack received: ', newMessage.decode())
         continue
       
       checksumNew = hashlib.md5(newMessage.encode()).digest()
       if(checksumNew != checksum):
-        print('Corrupted Packet Received')
         continue
     
       if(seqNumber >= base - self.windowSize - 1 and seqNumber < base + self.windowSize):   # confirm this
@@ -120,7 +122,6 @@ class Socket:
         self.sock.sendto(ack, address)  
 
       if(seqNumber >= base and seqNumber < base + self.windowSize):
-        print('header = ', newMessage[ : self.headerWidth])
         newMessage = newMessage[self.headerWidth : ]
         
         if(receiveWindow[seqNumber - base] == None):
@@ -141,6 +142,10 @@ class Socket:
             break
                   
     return (str.encode(message), address)
+
+
+  def close(self):
+    self.sock.close()
 
 
 if __name__ == "__main__":
