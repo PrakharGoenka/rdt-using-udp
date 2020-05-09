@@ -66,7 +66,7 @@ class Socket:
 
         try:
           self.sock.settimeout(max([0, self.timeout - (time.time() - sendTime[base % self.windowSize])]))
-          newData = self.sock.recvfrom(self.headerWidth)
+          newData = self.sock.recvfrom(self.segmentSize)
         except socket.timeout:
           pass
 
@@ -79,7 +79,11 @@ class Socket:
           self.sock.sendto(chunks[base], server)
           sendTime[base % self.windowSize] = time.time() 
         else:
-          newMessage = newData[0].decode()
+          newMessage = newData[0][ : -(self.checksumWidth)].decode()
+          checksum = newData[0][-(self.checksumWidth) : ]      
+          checksumNew = hashlib.md5(newMessage.encode()).digest()
+          if(checksumNew != checksum):
+            continue
           ackFlag = int(newMessage[ : 1])
           if(ackFlag == 0):
             continue    
@@ -122,6 +126,8 @@ class Socket:
       if(seqNumber >= base - windowSize - 1 and seqNumber < base + windowSize):   # confirm this
         ack = '10' + str(seqNumber)
         ack = str.encode(ack)
+        checksum = hashlib.md5(ack).digest()
+        ack += checksum
         self.sock.sendto(ack, address)  
 
       if(seqNumber >= base and seqNumber < base + windowSize):
