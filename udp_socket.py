@@ -72,6 +72,8 @@ class Socket:
 
         if(newData == None):
           prevIndex = (base - 1 + self.windowSize) % self.windowSize
+          if(sendTime[prevIndex] == 0):
+            sendTime[prevIndex] = time.time()
           if(time.time() - sendTime[prevIndex] > 60):
             raise TimeoutError('No acks received for too long.')
           self.sock.sendto(chunks[base], server)
@@ -140,7 +142,9 @@ class Socket:
           base += windowSize
           if(lastFlagU == 1):
             break
-                  
+
+    if(len(message) > bufferSize):
+      message = message[  : bufferSize]              
     return (str.encode(message), address)
 
 
