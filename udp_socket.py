@@ -4,7 +4,7 @@ import hashlib
 
 
 class Socket:
-  packetSize = 7
+  packetSize = 1200
   windowSize = 7
   sequnceRange = 1000
   sequenceWidth = len(str(sequnceRange))
@@ -65,9 +65,9 @@ class Socket:
         newData = None
 
         try:
-          self.sock.settimeout(max[0, self.timeout - (time.time() - sendTime[base & self.windowSize])])
+          self.sock.settimeout(max([0, self.timeout - (time.time() - sendTime[base % self.windowSize])]))
           newData = self.sock.recvfrom(self.headerWidth)
-        except:
+        except socket.timeout:
           pass
 
         if(newData == None):
@@ -93,9 +93,10 @@ class Socket:
 
 
   def recvfrom(self, bufferSize):
+    windowSize = self.windowSize
     message = ''
     address = ''
-    receiveWindow = [None] * self.windowSize
+    receiveWindow = [None] * windowSize
     base = 0    
     count = 0
     lastFlagU = 0
@@ -116,28 +117,27 @@ class Socket:
       if(checksumNew != checksum):
         continue
     
-      if(seqNumber >= base - self.windowSize - 1 and seqNumber < base + self.windowSize):   # confirm this
+      if(seqNumber >= base - windowSize - 1 and seqNumber < base + windowSize):   # confirm this
         ack = '10' + str(seqNumber)
         ack = str.encode(ack)
         self.sock.sendto(ack, address)  
 
-      if(seqNumber >= base and seqNumber < base + self.windowSize):
+      if(seqNumber >= base and seqNumber < base + windowSize):
         newMessage = newMessage[self.headerWidth : ]
-        
         if(receiveWindow[seqNumber - base] == None):
           count += 1
         receiveWindow[seqNumber - base] = newMessage
         
         lastFlagU = lastFlag or lastFlagU
         if(lastFlag == 1):
-          self.windowSize = seqNumber - base + 1
+          windowSize = seqNumber - base + 1
 
-        if(count == self.windowSize):
-          for i in range(0, self.windowSize):
+        if(count == windowSize):
+          for i in range(0, windowSize):
             message += receiveWindow[i]  
-          receiveWindow = [None] * self.windowSize
+          receiveWindow = [None] * windowSize
           count = 0
-          base += self.windowSize
+          base += windowSize
           if(lastFlagU == 1):
             break
                   

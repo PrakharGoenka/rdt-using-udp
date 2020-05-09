@@ -13,11 +13,9 @@ sock.sendto(file_name.encode(), serv_addr)
 
 with open(file_add) as f:
     data = f.read(BUFFER)
-
+    print("sending file")
     while (data):
         sock.sendto(data.encode(), serv_addr)
-        print("sending file")
         data = f.read(BUFFER)
 
-    # sock.close()
-sock.sendto("done".encode(), serv_addr)
+sock.close()

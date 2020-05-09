@@ -1,3 +1,4 @@
+import sys
 from udp_socket import Socket
 
 host = "127.0.0.1"
@@ -9,21 +10,21 @@ sock = Socket()
 sock.bind(addr)
 print("listening")
 
-BUFFER = 512
+BUFFER = 10000
 
 file_name, addr = sock.recvfrom(BUFFER)
 file_name = file_name.decode().strip()
 
-target = '/received/'
+target = sys.argv[1]
 file_name = target + file_name
 print("writing to " + file_name)
 
-with open(file_name, 'a') as f:
+with open(file_name, 'w') as f:
     data, addr = sock.recvfrom(BUFFER)
-    try:    
+    try: 
         f.write(data.decode())
-        data, addr = sock.recvfrom(BUFFER)
     except EnvironmentError as err:
         print(err)
         
+sock.close()
     
