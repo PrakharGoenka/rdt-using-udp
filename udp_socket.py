@@ -73,7 +73,7 @@ class Socket:
         if(newData == None):
           prevIndex = (base - 1 + self.windowSize) % self.windowSize
           if(time.time() - sendTime[prevIndex] > 60):
-            ack[base % self.windowSize] = 1    # Assume data delivered after 20 attempts
+            raise TimeoutError('No acks received for too long.')
           self.sock.sendto(chunks[base], server)
           sendTime[base % self.windowSize] = time.time() 
         else:
